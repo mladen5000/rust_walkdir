@@ -1,13 +1,13 @@
 use fastq::*;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::fs;
 use std::fs::metadata;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::{fs, path};
 use walkdir::WalkDir;
 
-const MIN_COUNT: u64 = 10;
+const MIN_COUNT: u64 = 1;
 const TOTAL_SIZE: u64 = 1024u64.pow(3);
 
 mod fastq;
@@ -19,30 +19,30 @@ struct FileStats {
 
 fn main() {
     // Walkdir execution
-    // let root_dir = "/hdd";
-    // calculate_fsizes_by_ext(root_dir);
+    let root_dir = Path::new("/hdd/");
+    calculate_fsizes_by_ext(root_dir);
 
     // Fastq execution
-    fastq_main();
+    // fastq_main();
 }
 
-fn calculate_fsizes_by_ext(root_dir: &str) {
+/// Calculate file sizes by extension for all files in the given root directory.
+fn calculate_fsizes_by_ext(root_dir: &Path) {
     let x: HashMap<String, FileStats> = HashMap::new();
     let file_stats = Mutex::new(HashMap::new());
 
-    // List and collect all subdirectories (except hidden)
+    // 1. List and collect all subdirectories (except hidden)
     let subdirs = fetch_subdirs(root_dir);
-
     println!("Subdirs: {:?}", subdirs);
 
-    // Parallelize walks starting from each subdir
+    // 2. Parallelize walks starting from each subdir
     build_hashmap(subdirs, &file_stats);
 
+    // 3. Convert Mutex to HashMap to Vec
     // TODO: Separate out sorting from Vec conversion, move sorting to after calculation of file size
-    // Convert Mutex to HashMap to Vec
     let sorted_stats = sort_results(file_stats);
 
-    // Print stats by extensions
+    // 4. Print stats by extensions
     for (ext, fstat) in sorted_stats {
         // Calculate average file size
         let avg_size = calc_avg_filesize(&fstat);
@@ -51,8 +51,10 @@ fn calculate_fsizes_by_ext(root_dir: &str) {
     }
 }
 
-fn fetch_subdirs(root_dir: &str) -> Vec<std::path::PathBuf> {
-    let subdirs: Vec<_> = fs::read_dir(root_dir)
+/// Part 1 - Fetch subdirectories from the given root directory.
+fn fetch_subdirs(root_dir: &Path) -> Vec<PathBuf> {
+    // Return a vector of PathBuf Objects
+    fs::read_dir(root_dir)
         .expect("Failed to read directory")
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_dir())
@@ -62,12 +64,12 @@ fn fetch_subdirs(root_dir: &str) -> Vec<std::path::PathBuf> {
                 .map(|s| s.starts_with("."))
                 .unwrap_or(false)
         })
-        .map(|e| e.path())
-        .collect();
-    subdirs
+        .map(|e| e.path()) // get full path
+        .collect()
 }
 
-fn build_hashmap(subdirs: Vec<std::path::PathBuf>, file_stats: &Mutex<HashMap<String, FileStats>>) {
+/// Part 2 - Build a hashmap of file statistics by extension for the given subdirectories.
+fn build_hashmap(subdirs: Vec<PathBuf>, file_stats: &Mutex<HashMap<String, FileStats>>) {
     subdirs.par_iter().for_each(|subdir| {
         WalkDir::new(subdir)
             .into_iter()
@@ -82,6 +84,7 @@ fn build_hashmap(subdirs: Vec<std::path::PathBuf>, file_stats: &Mutex<HashMap<St
     })
 }
 
+/// Aggregate file statistics by extension for the given file path.
 fn aggregate_by_ext<P: AsRef<Path>>(path: P, file_stats: &Mutex<HashMap<String, FileStats>>) {
     let path = path.as_ref();
     // Rest of the code remains the same
@@ -98,6 +101,7 @@ fn aggregate_by_ext<P: AsRef<Path>>(path: P, file_stats: &Mutex<HashMap<String, 
     }
 }
 
+/// Sort the file statistics hashmap by total size and convert it to a vector.
 fn sort_results(file_stats: Mutex<HashMap<String, FileStats>>) -> Vec<(String, FileStats)> {
     let mut sorted_stats = file_stats
         .into_inner()
@@ -110,6 +114,7 @@ fn sort_results(file_stats: Mutex<HashMap<String, FileStats>>) -> Vec<(String, F
     sorted_stats
 }
 
+/// Calculate the average file size for the given file statistics.
 fn calc_avg_filesize(fstat: &FileStats) -> u64 {
     let avg_size = if fstat.fcount > 0 {
         fstat.fsize / fstat.fcount
@@ -119,6 +124,7 @@ fn calc_avg_filesize(fstat: &FileStats) -> u64 {
     avg_size
 }
 
+/// Print the file statistics, including the average file size, for the given extension.
 fn print_results(fstat: FileStats, avg_size: u64, ext: String) {
     if fstat.fcount > MIN_COUNT && fstat.fsize > TOTAL_SIZE {
         // Print total size as human readable string
@@ -131,6 +137,7 @@ fn print_results(fstat: FileStats, avg_size: u64, ext: String) {
     }
 }
 
+/// Convert the total size to a human-readable string.
 fn get_human_readable_size(total_size: u64) -> String {
     let human_size = if total_size < 1024u64.pow(1) {
         format!("{} B", total_size)
@@ -143,6 +150,7 @@ fn get_human_readable_size(total_size: u64) -> String {
     };
     human_size
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -163,6 +171,7 @@ mod tests {
         assert_eq!(get_human_readable_size(1048576), "1 MB");
         assert_eq!(get_human_readable_size(1073741824), "1 GB");
     }
+
     #[test]
     fn test_build_hashmap() {
         let subdirs = vec![
