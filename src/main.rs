@@ -1,10 +1,10 @@
-use fastq::*;
+
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::fs::metadata;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::{fs, path};
+use std::{fs};
 use walkdir::WalkDir;
 
 const MIN_COUNT: u64 = 1;
@@ -28,7 +28,7 @@ fn main() {
 
 /// Calculate file sizes by extension for all files in the given root directory.
 fn calculate_fsizes_by_ext(root_dir: &Path) {
-    let x: HashMap<String, FileStats> = HashMap::new();
+    let _x: HashMap<String, FileStats> = HashMap::new();
     let file_stats = Mutex::new(HashMap::new());
 
     // 1. List and collect all subdirectories (except hidden)
@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn test_sort_results() {
         let file_stats = Mutex::new(HashMap::new());
-        let sorted_stats = sort_results(file_stats);
+        let _sorted_stats = sort_results(file_stats);
         // Add assertions here to verify the correctness of the function
     }
 
